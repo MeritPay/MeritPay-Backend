@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Employer-configured employee (base salary, hours threshold, bonus rates).
+// Mirrors the employer dashboard config described in CLAUDE.md's Employee type.
+model Employee {
+  id             String   @id @default(cuid())
+  employerWallet String
+  employeeId     Int
+  name           String
+  baseSalary     Int
+  hoursThreshold Int
+  bonusRateHours Int      @default(20)
+  bonusRateSales Int      @default(10)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([employerWallet, employeeId])
+}
+
+// A batch payroll execution (Step 1). Replaces the localStorage ClaimBundle save.
+model PayrollEpoch {
+  id             String       @id @default(cuid())
+  epoch          Int          @unique
+  employerWallet String
+  totalPayroll   String
+  txHash         String?
+  executedAt     DateTime     @default(now())
+  claimEntries   ClaimEntry[]
+}
+
+// One employee's claim material within an epoch, plus claim status.
+// Replaces both the ClaimBundle entries and the meritpay:claimed-nullifiers flag.
+model ClaimEntry {
+  id            String       @id @default(cuid())
+  epochId       String
+  epoch         PayrollEpoch @relation(fields: [epochId], references: [id])
+  employeeId    Int
+  employeeName  String
+  nullifier     String       @unique
+  amountStroops String
+  proof         String
+  publicSignals String
+  claimed       Boolean      @default(false)
+  claimTxHash   String?
+  claimedAt     DateTime?
+
+  @@index([epochId])
+}
