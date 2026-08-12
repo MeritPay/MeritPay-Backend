@@ -1,6 +1,6 @@
 # MeritPay Backend
 
-Minimal persistence API for [MeritPay](https://github.com/Samuel1505/MeritPay), a zero-knowledge, performance-linked payroll system on Stellar Soroban. See `hack.md` and `CLAUDE.md` for the full project architecture.
+Minimal persistence API for MeritPay, a zero-knowledge, performance-linked payroll system on Stellar Soroban. See `hack.md` and `CLAUDE.md` for the full project architecture.
 
 ## Why this exists
 
