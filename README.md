@@ -13,6 +13,48 @@ This service replaces both with a real API + database, plus a place to persist t
 
 **Privacy note:** this backend never stores raw KPI inputs (hours worked, sales figures) — those never leave the employee's browser in the ZK design, and persisting them here would defeat the point. It only stores employer-set config and data that is already public once posted on-chain (nullifiers, proofs, public signals, amounts in stroops).
 
+## Architecture
+
+This backend sits alongside the on-chain verification path, not inside it — Soroban is still the source of truth for whether a proof is valid and a nullifier is spent. The API only persists what the browsers would otherwise lose to `localStorage`.
+
+```mermaid
+flowchart LR
+    subgraph Employer["Employer Browser"]
+        EP["snarkjs: generatePayrollProof()"]
+    end
+
+    subgraph Employee["Employee Browser"]
+        EEP["snarkjs: generateClaimProof()"]
+    end
+
+    subgraph Backend["MeritPay Backend (this repo)"]
+        API["Express API"]
+        DB[("SQLite / Postgres\nvia Prisma")]
+        API --> DB
+    end
+
+    subgraph Soroban["Stellar Soroban (Testnet)"]
+        Verifier["groth16_verifier"]
+        Payroll["payroll contract"]
+        Claim["claim contract"]
+        Payroll --> Verifier
+        Claim --> Verifier
+        Claim -- "is_nullifier_spent" --> Payroll
+    end
+
+    EP -- "1: execute_payroll(proof)" --> Payroll
+    EP -- "2: POST /epochs\n(claim bundle)" --> API
+    EEP -- "3: GET /epochs/:epoch/claims/:employeeId" --> API
+    EEP -- "4: claim_payout(proof)" --> Claim
+    EEP -- "5: POST /claims/:nullifier/complete" --> API
+```
+
+1. The employer generates the payroll proof and submits it to the `payroll` contract, which verifies it via `groth16_verifier` and moves escrow.
+2. The employer publishes the resulting claim bundle to this API instead of `localStorage`.
+3. Each employee fetches their own claim entry (proof, public signals, amount) from the API.
+4. The employee submits their claim proof to the `claim` contract, which independently re-verifies it and checks `is_nullifier_spent` against the `payroll` contract.
+5. The employee reports the completed claim back to the API so the status mirror stays in sync.
+
 ## Stack
 
 Node.js + Express + TypeScript + Prisma. Defaults to SQLite for local dev; point `DATABASE_URL` at Postgres to swap without code changes (update `provider` in `prisma/schema.prisma` to `"postgresql"` first).
