@@ -6,6 +6,7 @@ import { errorHandler } from "./middleware/errorHandler";
 import { walletAuthMiddleware } from "./middleware/walletAuth";
 import { rateLimitMiddleware } from "./middleware/rateLimit";
 import { healthRouter } from "./routes/health";
+import { authRouter } from "./routes/auth";
 import { employeesRouter } from "./routes/employees";
 import { epochsRouter } from "./routes/epochs";
 import { claimsRouter } from "./routes/claims";
@@ -40,10 +41,11 @@ app.use((req, res, next) => {
 // Security: Apply rate limiting globally
 app.use(rateLimitMiddleware(60000, 100)); // 100 req/min per IP/wallet
 
-// Health check endpoint (no auth required)
+// Health check + wallet challenge/verify endpoints (no session required)
 app.use(healthRouter);
+app.use(authRouter);
 
-// Security: All other routes require wallet authentication
+// Security: All other routes require a verified wallet session
 app.use(walletAuthMiddleware);
 
 // Apply wallet-protected routes
