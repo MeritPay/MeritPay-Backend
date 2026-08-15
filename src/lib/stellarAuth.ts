@@ -12,9 +12,16 @@ interface Challenge {
   expiresAt: number;
 }
 
+interface Session {
+  employerWallet: string;
+  expiresAt: number;
+}
+
 const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 const challenges = new Map<string, Challenge>(); // key: employerWallet
+const sessions = new Map<string, Session>(); // key: session token
 
 export function issueChallenge(employerWallet: string): { nonce: string; expiresAt: number } {
   const nonce = crypto.randomBytes(32).toString("hex");
@@ -44,4 +51,21 @@ export function verifyChallengeSignature(
   } catch {
     return false;
   }
+}
+
+export function createSession(employerWallet: string): { token: string; expiresAt: number } {
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  sessions.set(token, { employerWallet, expiresAt });
+  return { token, expiresAt };
+}
+
+export function resolveSession(token: string): string | undefined {
+  const session = sessions.get(token);
+  if (!session) return undefined;
+  if (Date.now() > session.expiresAt) {
+    sessions.delete(token);
+    return undefined;
+  }
+  return session.employerWallet;
 }
