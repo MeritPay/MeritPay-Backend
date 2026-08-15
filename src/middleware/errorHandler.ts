@@ -18,7 +18,8 @@ export function errorHandler(
   _next: NextFunction
 ) {
   if (err instanceof ZodError) {
-    res.status(400).json({ error: "Invalid request", details: err.issues });
+    // Don't expose validation schema details in production
+    res.status(400).json({ error: "Invalid request: validation failed" });
     return;
   }
 
@@ -31,7 +32,7 @@ export function errorHandler(
       res.status(404).json({ error: "Not found" });
       return;
     }
-    // Generic Prisma error
+    // Generic Prisma error - don't expose details
     res.status(500).json({ error: "Database error" });
     return;
   }
@@ -43,7 +44,7 @@ export function errorHandler(
 
   if (err instanceof Prisma.PrismaClientRustPanicError) {
     console.error("Prisma panic:", err.message);
-    res.status(500).json({ error: "Database panic" });
+    res.status(500).json({ error: "Database error" });
     return;
   }
 
@@ -53,7 +54,7 @@ export function errorHandler(
   }
 
   if (err instanceof Error) {
-    console.error(err.message);
+    console.error("Unhandled error:", err.message);
   } else {
     console.error("Unknown error:", err);
   }
