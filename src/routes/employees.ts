@@ -10,6 +10,15 @@ employeesRouter.post("/employees", async (req, res, next) => {
   try {
     const body = upsertEmployeeSchema.parse(req.body);
 
+    const existing = await prisma.employee.findUnique({
+      where: {
+        employerWallet_employeeId: {
+          employerWallet: body.employerWallet,
+          employeeId: body.employeeId,
+        },
+      },
+    });
+
     const employee = await prisma.employee.upsert({
       where: {
         employerWallet_employeeId: {
@@ -21,7 +30,9 @@ employeesRouter.post("/employees", async (req, res, next) => {
       update: body,
     });
 
-    res.status(200).json(employee);
+    // Return 201 for new records, 200 for updates
+    const status = existing ? 200 : 201;
+    res.status(status).json(employee);
   } catch (err) {
     next(err);
   }
