@@ -11,12 +11,19 @@ export const claimsRouter = Router();
 claimsRouter.post("/claims/:nullifier/complete", async (req, res, next) => {
   try {
     const { txHash } = completeClaimSchema.parse(req.body);
+    const authenticatedWallet = res.locals.employerWallet;
 
     const claimEntry = await prisma.claimEntry.findUnique({
       where: { nullifier: req.params.nullifier },
+      include: { epoch: true },
     });
     if (!claimEntry) {
       throw new HttpError(404, "Claim entry not found");
+    }
+
+    // Verify wallet authorization: can only mark claims complete for own epochs
+    if (claimEntry.epoch.employerWallet !== authenticatedWallet) {
+      throw new HttpError(403, "Unauthorized: cannot mark other employers' claims as complete");
     }
 
     const updated = await prisma.claimEntry.update({
@@ -39,9 +46,17 @@ claimsRouter.get("/claims/:nullifier", async (req, res, next) => {
   try {
     const claimEntry = await prisma.claimEntry.findUnique({
       where: { nullifier: req.params.nullifier },
+      include: { epoch: true },
     });
     if (!claimEntry) {
       throw new HttpError(404, "Claim entry not found");
+    }
+
+    const authenticatedWallet = res.locals.employerWallet;
+
+    // Verify wallet authorization: can only read own claims
+    if (claimEntry.epoch.employerWallet !== authenticatedWallet) {
+      throw new HttpError(403, "Unauthorized: cannot access other employers' claims");
     }
 
     res.json({

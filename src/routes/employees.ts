@@ -9,6 +9,12 @@ export const employeesRouter = Router();
 employeesRouter.post("/employees", async (req, res, next) => {
   try {
     const body = upsertEmployeeSchema.parse(req.body);
+    const authenticatedWallet = res.locals.employerWallet;
+
+    // Verify wallet authorization: can only modify own employees
+    if (body.employerWallet !== authenticatedWallet) {
+      throw new HttpError(403, "Unauthorized: cannot modify other employers' employees");
+    }
 
     const existing = await prisma.employee.findUnique({
       where: {
@@ -41,6 +47,12 @@ employeesRouter.post("/employees", async (req, res, next) => {
 employeesRouter.get("/employees", async (req, res, next) => {
   try {
     const { employerWallet } = listEmployeesQuerySchema.parse(req.query);
+    const authenticatedWallet = res.locals.employerWallet;
+
+    // Verify wallet authorization: can only list own employees
+    if (employerWallet !== authenticatedWallet) {
+      throw new HttpError(403, "Unauthorized: cannot list other employers' employees");
+    }
 
     const employees = await prisma.employee.findMany({
       where: { employerWallet },
@@ -58,6 +70,13 @@ employeesRouter.delete("/employees/:id", async (req, res, next) => {
     const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
     if (!existing) {
       throw new HttpError(404, "Employee not found");
+    }
+
+    const authenticatedWallet = res.locals.employerWallet;
+
+    // Verify wallet authorization: can only delete own employees
+    if (existing.employerWallet !== authenticatedWallet) {
+      throw new HttpError(403, "Unauthorized: cannot delete other employers' employees");
     }
 
     await prisma.employee.delete({ where: { id: req.params.id } });

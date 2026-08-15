@@ -23,6 +23,12 @@ function serializeClaimEntry(entry: ClaimEntry) {
 epochsRouter.post("/epochs", async (req, res, next) => {
   try {
     const body = createEpochSchema.parse(req.body);
+    const authenticatedWallet = res.locals.employerWallet;
+
+    // Verify wallet authorization: can only create epochs for own wallet
+    if (body.employerWallet !== authenticatedWallet) {
+      throw new HttpError(403, "Unauthorized: cannot create epochs for other employers");
+    }
 
     const epoch = await prisma.payrollEpoch.create({
       data: {
@@ -56,8 +62,8 @@ epochsRouter.post("/epochs", async (req, res, next) => {
 epochsRouter.get("/epochs/:epoch", async (req, res, next) => {
   try {
     const epochNumber = Number(req.params.epoch);
-    if (!Number.isInteger(epochNumber)) {
-      throw new HttpError(400, "epoch must be an integer");
+    if (!Number.isInteger(epochNumber) || epochNumber < 0) {
+      throw new HttpError(400, "epoch must be a non-negative integer");
     }
 
     const epoch = await prisma.payrollEpoch.findUnique({
@@ -67,6 +73,13 @@ epochsRouter.get("/epochs/:epoch", async (req, res, next) => {
 
     if (!epoch) {
       throw new HttpError(404, "Epoch not found");
+    }
+
+    const authenticatedWallet = res.locals.employerWallet;
+
+    // Verify wallet authorization: can only read own epochs
+    if (epoch.employerWallet !== authenticatedWallet) {
+      throw new HttpError(403, "Unauthorized: cannot access other employers' epochs");
     }
 
     res.json({
@@ -83,13 +96,20 @@ epochsRouter.get("/epochs/:epoch/claims/:employeeId", async (req, res, next) => 
   try {
     const epochNumber = Number(req.params.epoch);
     const employeeId = Number(req.params.employeeId);
-    if (!Number.isInteger(epochNumber) || !Number.isInteger(employeeId)) {
-      throw new HttpError(400, "epoch and employeeId must be integers");
+    if (!Number.isInteger(epochNumber) || epochNumber < 0 || !Number.isInteger(employeeId) || employeeId < 0) {
+      throw new HttpError(400, "epoch and employeeId must be non-negative integers");
     }
 
     const epoch = await prisma.payrollEpoch.findUnique({ where: { epoch: epochNumber } });
     if (!epoch) {
       throw new HttpError(404, "Epoch not found");
+    }
+
+    const authenticatedWallet = res.locals.employerWallet;
+
+    // Verify wallet authorization: can only read own epochs
+    if (epoch.employerWallet !== authenticatedWallet) {
+      throw new HttpError(403, "Unauthorized: cannot access other employers' epochs");
     }
 
     const claimEntry = await prisma.claimEntry.findFirst({
