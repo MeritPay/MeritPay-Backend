@@ -31,6 +31,20 @@ export function errorHandler(
       res.status(404).json({ error: "Not found" });
       return;
     }
+    // Generic Prisma error
+    res.status(500).json({ error: "Database error" });
+    return;
+  }
+
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    res.status(400).json({ error: "Invalid database request" });
+    return;
+  }
+
+  if (err instanceof Prisma.PrismaClientRustPanicError) {
+    console.error("Prisma panic:", err.message);
+    res.status(500).json({ error: "Database panic" });
+    return;
   }
 
   if (err instanceof HttpError) {
@@ -38,6 +52,10 @@ export function errorHandler(
     return;
   }
 
-  console.error(err);
+  if (err instanceof Error) {
+    console.error(err.message);
+  } else {
+    console.error("Unknown error:", err);
+  }
   res.status(500).json({ error: "Internal server error" });
 }
