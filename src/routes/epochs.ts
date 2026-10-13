@@ -6,17 +6,29 @@ import { createEpochSchema } from "../lib/validation";
 
 export const epochsRouter = Router();
 
-function serializeClaimEntry(entry: ClaimEntry) {
+export function serializeClaimEntry(entry: ClaimEntry) {
+  let proof: unknown;
+  let publicSignals: unknown;
+
   try {
-    return {
-      ...entry,
-      proof: JSON.parse(entry.proof),
-      publicSignals: JSON.parse(entry.publicSignals),
-    };
+    proof = JSON.parse(entry.proof);
   } catch (err) {
-    console.error(`Failed to parse JSON for claim entry ${entry.id}:`, err);
-    throw new Error(`Failed to deserialize claim entry ${entry.id}: invalid JSON`);
+    console.error(`Failed to parse proof JSON for claim entry ${entry.id}:`, err);
+    throw new HttpError(500, `Corrupt claim entry ${entry.id}: invalid proof JSON`);
   }
+
+  try {
+    publicSignals = JSON.parse(entry.publicSignals);
+  } catch (err) {
+    console.error(`Failed to parse publicSignals JSON for claim entry ${entry.id}:`, err);
+    throw new HttpError(500, `Corrupt claim entry ${entry.id}: invalid publicSignals JSON`);
+  }
+
+  return {
+    ...entry,
+    proof,
+    publicSignals,
+  };
 }
 
 // Create a payroll epoch + its claim bundle in one call, right after execute_payroll succeeds.
