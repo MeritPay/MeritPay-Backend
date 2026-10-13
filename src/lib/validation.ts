@@ -22,14 +22,49 @@ export const listEmployeesQuerySchema = z.object({
   employerWallet: stellarWalletSchema,
 });
 
-export const claimEntryInputSchema = z.object({
-  employeeId: z.number().int().min(0).max(1000000),
-  employeeName: z.string().min(1).max(255),
-  nullifier: z.string().min(1).max(500, "nullifier too long"),
-  amountStroops: z.string().regex(/^\d+$/, "amountStroops must be numeric").min(1),
-  proof: z.unknown(),
-  publicSignals: z.array(z.string()).min(1).max(100, "too many public signals"),
-});
+export const decimalString = z
+  .string()
+  .regex(/^\d+$/, "must be a non-negative integer string");
+
+export const groth16ProofSchema = z
+  .object({
+    pi_a: z.array(z.string()).length(3),
+    pi_b: z.array(z.array(z.string())).length(3),
+    pi_c: z.array(z.string()).length(3),
+    protocol: z.literal("groth16").optional(),
+    curve: z.string().optional(),
+  })
+  .passthrough();
+
+export const CLAIM_PUBLIC_SIGNALS_COUNT = 3;
+
+export const claimEntryInputSchema = z
+  .object({
+    employeeId: z.number().int().min(0).max(1000000),
+    employeeName: z.string().min(1).max(255),
+    nullifier: decimalString,
+    amountStroops: decimalString,
+    proof: groth16ProofSchema,
+    publicSignals: z.array(decimalString).length(CLAIM_PUBLIC_SIGNALS_COUNT),
+  })
+  .superRefine((entry, ctx) => {
+    if (entry.publicSignals && entry.publicSignals.length >= 3) {
+      if (entry.publicSignals[0] !== entry.nullifier) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["publicSignals", 0],
+          message: `publicSignals[0] (${entry.publicSignals[0]}) does not match nullifier (${entry.nullifier})`,
+        });
+      }
+      if (entry.publicSignals[2] !== entry.amountStroops) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["publicSignals", 2],
+          message: `publicSignals[2] (${entry.publicSignals[2]}) does not match amountStroops (${entry.amountStroops})`,
+        });
+      }
+    }
+  });
 
 export const createEpochSchema = z.object({
   epoch: z.number().int().min(0).max(1000000, "epoch must be between 0 and 1000000"),
